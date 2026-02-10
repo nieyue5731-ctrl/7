@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="description" content="Terraria Ultra - Aesthetic Edition - A beautiful 2D sandbox game">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+        name="viewport" />
+    <meta content="yes" name="apple-mobile-web-app-capable" />
+    <meta content="yes" name="mobile-web-app-capable" />
+    <meta content="#1a1a2e" name="theme-color" />
+    <title>Terraria Ultra - Aesthetic Edition</title>
+
+    <!-- ========================= CSS: Variables, Reset, Core UI ========================= -->
+    <link rel="stylesheet" href="css/mobile-controls.css" />
+    <link rel="stylesheet" href="css/main.css" />
+    <link rel="stylesheet" href="css/theme-frost.css" />
+    <link rel="stylesheet" href="css/loading.css" />
+    <link rel="stylesheet" href="css/performance.css" />
+    <link rel="stylesheet" href="css/low-perf.css" />
+
+    <!-- ========================= JS: Defensive Infrastructure ========================= -->
+    <script src="js/core/defensive.js"></script>
+</head>
+
+<body>
+    <canvas id="game"></canvas>
+    <!-- Ambient particles -->
+    <div id="ambient-particles"></div>
+    <!-- Loading screen -->
+    <div id="loading">
+        <div class="loading-particles"></div>
+        <div class="loading-content">
+            <h1>TERRARIA ULTRA</h1>
+            <p class="subtitle">Aesthetic Edition</p>
+            <div class="progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-fill" id="load-progress"></div>
+            </div>
+            <div class="status" id="load-status" aria-live="polite">Initializing...</div>
+        </div>
+    </div>
+    <!-- Landscape hint -->
+    <div id="rotate-hint">
+        <div class="icon">📱</div>
+        <p>Please rotate to landscape for the best experience</p>
+    </div>
+    <!-- Crafting overlay -->
+    <div id="crafting-overlay">
+        <div id="crafting-panel">
+            <div class="close-btn" id="craft-close">✕</div>
+            <div class="craft-list-container">
+                <div class="craft-header">
+                    <span>🔨 Craft</span>
+                </div>
+                <div class="craft-grid" id="craft-grid"></div>
+            </div>
+            <div class="craft-details">
+                <div class="preview-box" id="craft-preview"></div>
+                <div class="item-title" id="craft-title">Select item</div>
+                <div class="item-desc" id="craft-desc">Click left panel to view recipe</div>
+                <div class="ingredients-list" id="craft-ingredients"></div>
+                <button class="craft-btn" disabled="" id="craft-action-btn">Craft</button>
+            </div>
+        </div>
+    </div>
+    <!-- Inventory overlay -->
+    <div aria-hidden="true" id="inventory-overlay">
+        <div aria-label="Inventory" id="inventory-panel" role="dialog">
+            <div class="inv-close-btn" id="inv-close" title="Close (Esc)">✕</div>
+            <div class="inv-left">
+                <div class="inv-topbar">
+                    <div class="inv-title">🎒 Inventory</div>
+                    <div class="inv-capacity">
+                        <span class="inv-capacity-text" id="inv-capacity-text">0/36</span>
+                        <div class="inv-capacity-bar">
+                            <div class="fill" id="inv-capacity-fill"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="inv-section">
+                    <div class="inv-section-label">Hotbar <span style="opacity:.6">(1-9)</span></div>
+                    <div class="inv-grid" id="inv-hotbar-grid"></div>
+                </div>
+                <div class="inv-section">
+                    <div class="inv-section-label">Backpack</div>
+                    <div class="inv-grid" id="inv-backpack-grid"></div>
+                </div>
+            </div>
+            <div class="inv-right">
+                <div class="inv-preview-box" id="inv-preview"></div>
+                <div class="inv-item-name" id="inv-item-name">None selected</div>
+                <div class="inv-item-meta" id="inv-item-meta"></div>
+                <div class="inv-item-desc" id="inv-item-desc">Click a slot to inspect, or drag/click to swap.</div>
+                <div class="inv-action-row">
+                    <button class="inv-btn primary" id="inv-sort">🧹 Sort</button>
+                    <button class="inv-btn" id="inv-to-hotbar">↔ To Hotbar</button>
+                    <button class="inv-btn" id="inv-put-back">↩ Put Back</button>
+                    <button class="inv-btn danger" id="inv-drop">🗑 Drop</button>
+                </div>
+                <div class="inv-hints">
+                    <div><kbd>LMB</kbd> Pick/Place  <kbd>RMB</kbd> Split/Place 1</div>
+                    <div><kbd>Shift</kbd>+<kbd>Click</kbd> Quick Move  <kbd>B</kbd>/<kbd>I</kbd> Open  <kbd>Esc</kbd> Close</div>
+                </div>
+            </div>
+        </div>
+        <!-- Cursor held item -->
+        <div aria-hidden="true" id="inv-held"></div>
+    </div>
+    <!-- UX: Pause / Settings / Save -->
+    <div aria-hidden="true" class="ux-overlay" id="pause-overlay">
+        <div class="ux-panel">
+            <div class="ux-title">
+                <h2>⏸ Paused</h2>
+                <button aria-label="Close" class="ux-close" id="pause-close">✕</button>
+            </div>
+            <div class="ux-grid">
+                <div class="ux-row">
+                    <label>
+                        <b>Hint</b>
+                        <small>The game does not update while paused; you can still browse UI and adjust settings.</small>
+                    </label>
+                    <span> </span>
+                </div>
+            </div>
+            <div class="ux-actions">
+                <button class="ux-action" id="pause-newworld">🧹 New World</button>
+                <button class="ux-action" id="pause-save">💾 Save</button>
+                <button class="ux-action" id="pause-fullscreen">🖥 Fullscreen</button>
+                <button class="ux-action primary" id="pause-resume">▶ Resume</button>
+            </div>
+        </div>
+    </div>
+    <div aria-hidden="true" class="ux-overlay" id="settings-overlay">
+        <div class="ux-panel">
+            <div class="ux-title">
+                <h2>⚙️ Settings</h2>
+                <button aria-label="Close" class="ux-close" id="settings-close">✕</button>
+            </div>
+            <div class="ux-grid">
+                <div class="ux-row">
+                    <label>
+                        Quality / Resolution
+                        <small>Lower values improve FPS on low-end devices.</small>
+                    </label>
+                    <select id="opt-dpr">
+                        <option value="1">Power Save (1x)</option>
+                        <option value="1.5">Balanced (1.5x)</option>
+                        <option value="2">HD (2x)</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Particles <small>Disable to reduce lag.</small></label>
+                    <select id="opt-particles">
+                        <option value="1">On</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Ambient FX <small>Disable to reduce DOM animation pressure.</small></label>
+                    <select id="opt-ambient">
+                        <option value="1">On</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Background Mountains <small>Disable for less overdraw.</small></label>
+                    <select id="opt-bgmountains">
+                        <option value="1">On</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Post FX (Bloom/Color/Vignette) <small>Lower for better FPS.</small></label>
+                    <select id="opt-postfx">
+                        <option value="2">Ultra</option>
+                        <option value="1">Light</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Minimap <small>Disable when not needed.</small></label>
+                    <select id="opt-minimap">
+                        <option value="1">On</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Touch Aim Assist <small>Snap to block centers on mobile.</small></label>
+                    <select id="opt-aimassist">
+                        <option value="1">On</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Vibration <small>Haptic feedback on supported devices.</small></label>
+                    <select id="opt-vibration">
+                        <option value="1">On</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Auto Quality <small>Automatically adjust for stable FPS.</small></label>
+                    <select id="opt-autoquality">
+                        <option value="1">On</option>
+                        <option value="0">Off</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Show FPS <small>Debug overlay.</small></label>
+                    <select id="opt-showfps">
+                        <option value="0">Off</option>
+                        <option value="1">On</option>
+                    </select>
+                </div>
+                <div class="ux-row">
+                    <label>Camera Smoothing <span class="ux-val" id="val-camsmooth"></span></label>
+                    <input id="opt-camsmooth" max="18" min="3" step="1" type="range" />
+                </div>
+                <div class="ux-row">
+                    <label>Camera Lookahead <span class="ux-val" id="val-lookahead"></span></label>
+                    <input id="opt-lookahead" max="150" min="0" step="5" type="range" />
+                </div>
+                <div class="ux-row">
+                    <label>Place Interval <span class="ux-val" id="val-placeinterval"></span></label>
+                    <input id="opt-placeinterval" max="160" min="40" step="5" type="range" />
+                </div>
+                <div class="ux-row">
+                    <label>Joystick Size <span class="ux-val" id="val-joy"></span></label>
+                    <input id="opt-joy" max="190" min="110" step="5" type="range" />
+                </div>
+                <div class="ux-row">
+                    <label>Button Size <span class="ux-val" id="val-btn"></span></label>
+                    <input id="opt-btn" max="92" min="58" step="2" type="range" />
+                </div>
+                <div class="ux-row">
+                    <label>SFX Volume <span class="ux-val" id="val-sfx"></span></label>
+                    <input id="opt-sfx" max="100" min="0" step="1" type="range" />
+                </div>
+                <div class="ux-row">
+                    <label>Reduce Motion <small>Less animation, less motion sickness.</small></label>
+                    <select id="opt-reduce-motion">
+                        <option value="0">Off</option>
+                        <option value="1">On</option>
+                    </select>
+                </div>
+            </div>
+            <div class="ux-actions">
+                <button class="ux-action" id="settings-reset">↩ Reset Defaults</button>
+                <button class="ux-action" id="settings-clear-save">🗑 Delete Save</button>
+                <button class="ux-action primary" id="settings-apply">✅ Apply</button>
+            </div>
+        </div>
+    </div>
+    <!-- Help overlay -->
+    <div aria-hidden="true" class="ux-overlay" id="help-overlay">
+        <div class="ux-panel">
+            <div class="ux-title">
+                <h2>❔ Controls &amp; Tips</h2>
+                <button aria-label="Close" class="ux-close" id="help-close">✕</button>
+            </div>
+            <div class="ux-grid">
+                <div class="ux-row help-desktop">
+                    <label>
+                        <b>Keyboard &amp; Mouse</b>
+                        <small>
+                            <span class="highlight">A/D</span> Move, <span class="highlight">W/Space</span> Jump, <span class="highlight">Shift</span> Sprint<br />
+                            <span class="highlight">LMB</span> Mine, <span class="highlight">RMB</span> Place, <span class="highlight">1-9</span> Switch Items<br />
+                            <span class="highlight">E</span> Crafting, <span class="highlight">Esc</span> Pause
+                        </small>
+                    </label>
+                    <span></span>
+                </div>
+                <div class="ux-row help-mobile">
+                    <label>
+                        <b>Touch</b>
+                        <small>
+                            Bottom-left <span class="highlight">joystick</span> to move; bottom-right buttons for jump/mine/place<br />
+                            <span class="highlight">Drag</span> screen to aim; push joystick fully for sprint
+                        </small>
+                    </label>
+                    <span></span>
+                </div>
+                <div class="ux-row">
+                    <label><b>Minimap</b> <small>Bottom-right corner; click to expand/collapse.</small></label>
+                    <span></span>
+                </div>
+                <div class="ux-row">
+                    <label><b>Save</b> <small>Top <span class="highlight">💾</span> button; also auto-saves on tab hide.</small></label>
+                    <span></span>
+                </div>
+            </div>
+            <div class="ux-actions">
+                <button class="ux-action" id="help-dontshow">✅ Don't show again</button>
+                <button class="ux-action primary" id="help-ok">Got it</button>
+            </div>
+        </div>
+    </div>
+    <!-- Save prompt -->
+    <div aria-hidden="true" class="ux-overlay" id="save-prompt-overlay">
+        <div class="ux-panel">
+            <div class="ux-title">
+                <h2>🗂 Save Detected</h2>
+                <button aria-label="Close" class="ux-close" id="save-prompt-close">✕</button>
+            </div>
+            <div class="ux-grid">
+                <div class="ux-row">
+                    <label>
+                        Continue from where you left off?
+                        <small>Continue: load save; New World: regenerate and overwrite.</small>
+                    </label>
+                    <span></span>
+                </div>
+            </div>
+            <div class="ux-actions">
+                <button class="ux-action" id="save-prompt-new">🌱 New World</button>
+                <button class="ux-action primary" id="save-prompt-continue">▶ Continue</button>
+            </div>
+        </div>
+    </div>
+    <!-- Mobile crafting toggle -->
+    <button id="btn-craft-toggle" aria-label="Open Crafting (E)" aria-keyshortcuts="E">⚒️</button>
+    <!-- Mobile inventory toggle -->
+    <button id="btn-bag-toggle" style="position: absolute; top: 60%; right: 10px;" aria-label="Open Inventory (B/I)" aria-keyshortcuts="B I">🎒</button>
+    <!-- UI layer -->
+    <div id="ui">
+        <div id="top-buttons">
+            <button class="top-btn" id="btn-pause" title="Pause/Resume" aria-label="Pause/Resume (Esc/P)" aria-keyshortcuts="Escape P">⏸</button>
+            <button class="top-btn" id="btn-settings" title="Settings" aria-label="Settings (O)" aria-keyshortcuts="O">⚙️</button>
+            <button class="top-btn" id="btn-save" title="Manual Save" aria-label="Save (Ctrl+S)" aria-keyshortcuts="Control+S Meta+S">💾</button>
+            <button class="top-btn" id="btn-inventory" title="Inventory (B/I)" aria-label="Inventory (B/I)" aria-keyshortcuts="B I">🎒</button>
+            <button class="top-btn" id="btn-help" title="Help" aria-label="Help (H)" aria-keyshortcuts="H">❔</button>
+        </div>
+        <div id="toast-container" aria-live="polite"></div>
+        <div id="hotbar"></div>
+        <div aria-hidden="true" class="item-hint" id="item-hint"></div>
+        <div id="stats">
+            <div class="stat-bar">
+                <span class="icon">💖</span>
+                <div class="bar" role="progressbar" aria-label="Health">
+                    <div class="fill" id="health-fill" style="width:100%"></div>
+                    <span class="value" id="health-value">100/100</span>
+                </div>
+            </div>
+            <div class="stat-bar">
+                <span class="icon">💫</span>
+                <div class="bar" role="progressbar" aria-label="Mana">
+                    <div class="fill" id="mana-fill" style="width:100%"></div>
+                    <span class="value" id="mana-value">50/50</span>
+                </div>
+            </div>
+        </div>
+        <div id="minimap"><canvas id="minimap-canvas"></canvas></div>
+        <div id="fps" style="position: absolute; top: 70px; right: 100px;">60 FPS</div>
+        <button id="fullscreen-btn" style="position: absolute; top: 50%; right: 10px; transform: translateY(-50%);" aria-label="Fullscreen (F)" aria-keyshortcuts="F">⛶</button>
+        <div id="time-display" style="position: absolute; top: 70px; right: 15px;">
+            <span id="time-icon">☀️</span> <span id="time-text">12:00</span>
+        </div>
+        <div id="info">
+            <span class="highlight">AD</span> Move |
+            <span class="highlight">W/Space</span> Jump |
+            <span class="highlight">LMB</span> Mine |
+            <span class="highlight">RMB</span> Place |
+            <span class="highlight">E</span> Crafting |
+            <span class="highlight">B</span> Inventory |
+            <span class="highlight">1-9</span> Switch
+        </div>
+        <div aria-hidden="true" id="mining-bar">
+            <div class="mb-top">
+                <canvas class="mb-icon" height="18" id="mining-icon" width="18"></canvas>
+                <div class="mb-name" id="mining-name">Mining...</div>
+                <div class="mb-percent" id="mining-percent">0%</div>
+            </div>
+            <div class="mb-track">
+                <div class="fill"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Mobile controls -->
+    <div id="mobile-controls">
+        <div class="joystick-container" id="joystick">
+            <div class="joystick-base"></div>
+            <div class="joystick-thumb" id="joystick-thumb"></div>
+        </div>
+        <div class="jump-container">
+            <div class="action-btn jump" id="btn-jump">⬆️</div>
+        </div>
+        <div class="action-buttons">
+            <div class="action-row">
+                <div class="action-btn mine" id="btn-mine">⛏️</div>
+                <div class="action-btn place" id="btn-place">🧱</div>
+            </div>
+        </div>
+    </div>
+    <!-- Crosshair -->
+    <div id="crosshair"></div>
+
+    <!-- ========================= JS: Core Modules (load order matters) ========================= -->
+    <!-- Phase 3 modules: EventManager, safe utils, pools -->
+    <script src="js/core/event-manager.js"></script>
+    <script src="js/performance/particle-pool.js"></script>
+    <script src="js/performance/perf-monitor-delegate.js"></script>
+
+    <!-- Core: pools, caches, utilities -->
+    <script src="js/performance/pools-and-cache.js"></script>
+    <script src="js/core/aliases.js"></script>
+    <script src="js/boot/loading-particles.js"></script>
+    <script src="js/core/utils.js"></script>
+
+    <!-- Systems -->
+    <script src="js/systems/settings.js"></script>
+    <script src="js/ui/toast.js"></script>
+    <script src="js/systems/fullscreen.js"></script>
+    <script src="js/systems/audio.js"></script>
+    <script src="js/systems/save.js"></script>
+    <script src="js/ui/ux-wiring.js"></script>
+
+    <!-- Constants & Data -->
+    <script src="js/core/constants.js"></script>
+
+    <!-- Engine -->
+    <script src="js/engine/noise-generator.js"></script>
+    <script src="js/engine/texture-generator.js"></script>
+    <script src="js/engine/crafting-recipes.js"></script>
+    <script src="js/engine/world-generator.js"></script>
+
+    <!-- Entities -->
+    <script src="js/entities/particle-system.js"></script>
+    <script src="js/entities/dropped-items.js"></script>
+    <script src="js/entities/ambient-particles.js"></script>
+    <script src="js/entities/player.js"></script>
+
+    <!-- Input -->
+    <script src="js/input/touch-controller.js"></script>
+
+    <!-- Renderer -->
+    <script src="js/engine/renderer.js"></script>
+
+    <!-- UI Systems -->
+    <script src="js/ui/crafting-system.js"></script>
+    <script src="js/ui/ui-manager.js"></script>
+    <script src="js/systems/quality.js"></script>
+    <script src="js/ui/minimap.js"></script>
+    <script src="js/ui/hotbar-renderer.js"></script>
+    <script src="js/ui/ui-extensions.js"></script>
+    <script src="js/ui/inventory-ui.js"></script>
+    <script src="js/input/input-manager.js"></script>
+    <script src="js/systems/inventory-system.js"></script>
+
+    <!-- Game Core -->
+    <script src="js/engine/game.js"></script>
+
+    <!-- Patch Layers (monkey-patches applied in order) -->
+    <script src="js/patches/patch-01-game-loop.js"></script>
+    <script src="js/patches/patch-02-weather.js"></script>
+    <script src="js/patches/patch-03-render-sky.js"></script>
+    <script src="js/patches/patch-04-tile-logic.js"></script>
+    <script src="js/patches/patch-05-structures.js"></script>
+    <script src="js/patches/patch-06-biomes.js"></script>
+    <script src="js/patches/patch-07-sprint.js"></script>
+    <script src="js/patches/patch-08-canvas-fx.js"></script>
+    <script src="js/patches/patch-09-minimap-fix.js"></script>
+    <script src="js/patches/patch-10-render-world.js"></script>
+    <script src="js/patches/patch-11-touch-controller.js"></script>
+    <script src="js/patches/patch-12-worker-client.js"></script>
+    <script src="js/patches/patch-13-error-guards.js"></script>
+    <script src="js/patches/patch-14-water-physics.js"></script>
+    <script src="js/patches/patch-15-tile-engine-class.js"></script>
+    <script src="js/patches/patch-16-pumps.js"></script>
+    <script src="js/patches/patch-17-runtime-opt.js"></script>
+    <script src="js/patches/patch-18-spreadlight.js"></script>
+
+    <!-- Bootstrap -->
+    <script src="js/boot/bootstrap.js"></script>
+    <script src="js/boot/health-check.js"></script>
+</body>
+
+</html>
